@@ -15,6 +15,7 @@ The authentication flow integrates into the Flask request lifecycle as follows:
 3. **Token validation** — The server's `before_request` middleware extracts the token from the header, verifies its signature and expiration, and stores the decoded user identity in the Flask request context (`flask.g`).
 4. **Route protection** — Individual route handlers use decorators (`@login_required`, `@admin_required`) to enforce authentication and role-based authorization.
 5. **Token refresh** — When the access token expires, the client uses the refresh token to obtain a new access token without re-entering credentials.
+6. **Logout** — The client sends the refresh token to the logout endpoint to revoke it. The server deletes the refresh token from the database, preventing further token refresh operations.
 
 See [Request Lifecycle](../architecture/request-lifecycle.md) for the complete request processing flow.
 
@@ -426,6 +427,69 @@ Example successful response:
   "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
   "token_type": "Bearer",
   "expires_in": 3600
+}
+```
+
+### Logout Flow
+
+The logout endpoint invalidates a refresh token, preventing it from being used to generate new access tokens. This is the server-side mechanism for ending a user session. After a successful logout, the client should discard both the access token and the refresh token.
+
+The logout flow works as follows:
+
+1. The client sends the refresh token to the logout endpoint along with a valid access token in the `Authorization` header.
+2. The server validates the access token and verifies the refresh token exists in the database.
+3. The server deletes the refresh token record from the database, revoking it permanently.
+4. The client discards both tokens from local storage.
+
+> **Note:** The access token remains technically valid until it expires (since JWTs are stateless), but the refresh token is immediately and permanently revoked. Clients should discard the access token upon logout to prevent further use.
+
+Logout endpoint implementation:
+
+```python
+@auth_bp.route("/logout", methods=["POST"])
+@login_required
+def logout():
+    """Invalidate a refresh token to log the user out.
+
+    Requires a valid access token in the Authorization header.
+
+    Request body:
+        refresh_token (str): The refresh token to revoke.
+
+    Returns:
+        200: JSON object with a success message.
+        400: If the refresh_token field is missing.
+        401: If the access token is missing or invalid,
+             or if the refresh token does not exist.
+    """
+    data = request.get_json()
+    refresh_token = data.get("refresh_token")
+
+    if not refresh_token:
+        return jsonify({"error": "Refresh token is required"}), 400
+
+    try:
+        auth_service.logout(refresh_token)
+    except ValueError:
+        return jsonify({"error": "Invalid refresh token"}), 401
+
+    return jsonify({"message": "Successfully logged out"}), 200
+```
+
+Example logout request using curl:
+
+```bash
+curl -X POST http://localhost:5000/api/auth/logout \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIs..." \
+  -d '{"refresh_token": "eyJhbGciOiJIUzI1NiIs..."}'
+```
+
+Example successful response:
+
+```json
+{
+  "message": "Successfully logged out"
 }
 ```
 

@@ -49,13 +49,20 @@ nav:
 
 plugins:
   - search
-  - mermaid2
+
+extra_javascript:
+  - https://unpkg.com/mermaid@11/dist/mermaid.min.js
 
 markdown_extensions:
   - tables
-  - fenced_code
-  - codehilite
   - admonition
   - toc:
       permalink: true
   - attr_list
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_div_format

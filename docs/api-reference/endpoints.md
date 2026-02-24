@@ -51,6 +51,7 @@ The following table lists every endpoint exposed by the Flask server:
 | `POST` | `/api/auth/login` | Authenticate user and receive tokens | No |
 | `POST` | `/api/auth/register` | Register a new user account | No |
 | `POST` | `/api/auth/refresh` | Refresh an expired access token | No |
+| `POST` | `/api/auth/logout` | Invalidate a refresh token (logout) | Yes |
 | `GET` | `/api/users/` | List all users (paginated) | Yes |
 | `GET` | `/api/users/<id>` | Get a specific user by ID | Yes |
 | `PUT` | `/api/users/<id>` | Update a user's information | Yes |
@@ -66,7 +67,7 @@ The following table lists every endpoint exposed by the Flask server:
 
 ## Authentication Endpoints
 
-Authentication endpoints are grouped under the `auth` blueprint with URL prefix `/api/auth`. These endpoints handle user login, registration, and token refresh. No authentication token is required to access any endpoint in this group.
+Authentication endpoints are grouped under the `auth` blueprint with URL prefix `/api/auth`. These endpoints handle user login, registration, token refresh, and logout. No authentication token is required to access login, registration, or token refresh endpoints. The logout endpoint requires a valid Bearer token.
 
 `Source: routes/auth.py`
 
@@ -254,6 +255,77 @@ response = requests.post(
 )
 data = response.json()
 new_access_token = data["access_token"]
+```
+
+---
+
+### POST /api/auth/logout
+
+Invalidates a refresh token, effectively logging the user out. The server revokes the provided refresh token so it can no longer be used to obtain new access tokens. Clients should discard both the access token and refresh token after a successful logout.
+
+**URL:** `/api/auth/logout`
+
+**Method:** `POST`
+
+**Authentication:** Required — Bearer token in `Authorization` header
+
+**Request Headers:**
+
+| Header | Value | Required |
+|---|---|---|
+| `Content-Type` | `application/json` | Yes |
+| `Authorization` | `Bearer <access_token>` | Yes |
+
+**Request Body:**
+
+```json
+{
+  "refresh_token": "string (required) — The refresh token to invalidate"
+}
+```
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `refresh_token` | `string` | Yes | The refresh token that should be revoked and invalidated |
+
+**Success Response:**
+
+- **Status:** `200 OK`
+
+```json
+{
+  "message": "Successfully logged out"
+}
+```
+
+**Error Responses:**
+
+| Status | Condition | Response Body |
+|---|---|---|
+| `400` | Missing or empty refresh_token field | `{"error": "Refresh token is required"}` |
+| `401` | Missing or invalid Bearer access token | `{"error": "Unauthorized"}` |
+| `401` | Refresh token not found or already revoked | `{"error": "Invalid refresh token"}` |
+
+**curl Example:**
+
+```bash
+curl -X POST http://localhost:5000/api/auth/logout \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIs..." \
+  -d '{"refresh_token": "eyJhbGciOiJIUzI1NiIs..."}'
+```
+
+**Python Example:**
+
+```python
+import requests
+
+response = requests.post(
+    "http://localhost:5000/api/auth/logout",
+    headers={"Authorization": "Bearer <access_token>"},
+    json={"refresh_token": "eyJhbGciOiJIUzI1NiIs..."},
+)
+print(response.json())  # {"message": "Successfully logged out"}
 ```
 
 ---

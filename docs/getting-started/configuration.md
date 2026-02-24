@@ -86,6 +86,7 @@ These variables configure Cross-Origin Resource Sharing (CORS) behavior, managed
 |---|---|---|---|---|
 | `CORS_ORIGINS` | Comma-separated list of allowed origins. Use `*` to allow all origins (suitable for development) or specify exact origins for production security. Each origin must include the scheme and host (e.g., `https://app.example.com`). | No | `*` | `http://localhost:3000,https://app.example.com` |
 | `CORS_METHODS` | Comma-separated list of HTTP methods permitted in cross-origin requests. Restricting methods in production reduces the attack surface for cross-origin abuse. | No | `GET,POST,PUT,DELETE,OPTIONS` | `GET,POST` |
+| `CORS_HEADERS` | Comma-separated list of allowed request headers in cross-origin requests. Controls which custom headers clients may include when making API requests from a different origin. | No | `Content-Type,Authorization` | `Content-Type,Authorization,X-Requested-With` |
 
 ### Logging Settings
 
@@ -158,6 +159,7 @@ JWT_ALGORITHM=HS256
 # =============================================================================
 CORS_ORIGINS=http://localhost:3000
 CORS_METHODS=GET,POST,PUT,DELETE,OPTIONS
+CORS_HEADERS=Content-Type,Authorization
 
 # =============================================================================
 # Logging

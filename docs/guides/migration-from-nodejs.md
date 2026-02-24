@@ -197,7 +197,7 @@ The following table maps every Node.js package used in the original server to it
 | `mongoose` | MongoDB ODM | `flask-sqlalchemy` | 3.1.1 | SQLAlchemy is database-agnostic; supports PostgreSQL, MySQL, SQLite |
 | `sequelize` | SQL ORM | `flask-sqlalchemy` | 3.1.1 | SQLAlchemy ORM with Flask integration and session management |
 | `knex` | SQL query builder | `sqlalchemy` (core) | via flask-sqlalchemy 3.1.1 | SQLAlchemy Core provides a composable query builder |
-| `jsonwebtoken` | JWT authentication | `pyjwt` | 2.10.1 | Standard JWT encoding and decoding library |
+| `jsonwebtoken` | JWT authentication | `pyjwt` | 2.11.0 | Standard JWT encoding and decoding library |
 | `bcrypt` / `bcryptjs` | Password hashing | `werkzeug.security` | bundled with Flask 3.1.3 | `generate_password_hash()` / `check_password_hash()` |
 | `dotenv` | Environment variables | `python-dotenv` | 1.0.1 | Same `.env` file pattern; loaded via `load_dotenv()` |
 | `morgan` | HTTP request logging | Flask `app.logger` | built-in | Python's `logging` module integrated with Flask |

@@ -29,7 +29,7 @@ The User Service provides business logic for user management, including CRUD ope
 
 ### create_user
 
-Creates a new user record in the database after validating that the email address is unique, hashing the password with bcrypt, and verifying that all input constraints are satisfied.
+Creates a new user record in the database after validating that the email address is unique, hashing the password with Werkzeug's security utilities, and verifying that all input constraints are satisfied.
 
 ```python
 def create_user(email: str, name: str, password: str, role: str = "user") -> dict
@@ -41,7 +41,7 @@ def create_user(email: str, name: str, password: str, role: str = "user") -> dic
 |---|---|---|---|---|
 | `email` | `str` | Yes | — | User's email address. Must be unique across all users. |
 | `name` | `str` | Yes | — | User's display name. Maximum 255 characters. |
-| `password` | `str` | Yes | — | User's plain-text password. Minimum 8 characters. Hashed with bcrypt before storage. |
+| `password` | `str` | Yes | — | User's plain-text password. Minimum 8 characters. Hashed with `werkzeug.security.generate_password_hash()` before storage. |
 | `role` | `str` | No | `"user"` | User role. Valid values: `"user"`, `"admin"`. |
 
 **Returns:** `dict` — Serialized user object containing `id`, `email`, `name`, `role`, `is_active`, `created_at`, and `updated_at` fields. The `password_hash` field is excluded from the serialized output. See the [User model serialization](models.md#serialization) for the complete field list.
@@ -239,7 +239,7 @@ delete_user(user_id=1)
 
 ## Auth Service
 
-The Auth Service handles authentication operations including credential validation, JWT access token generation, refresh token generation, and token decoding. All authentication-related route handlers in the `auth` blueprint delegate to functions in this module. The service uses PyJWT for token encoding and decoding, and bcrypt for password hashing and verification.
+The Auth Service handles authentication operations including credential validation, JWT access token generation, refresh token generation, token decoding, and logout (token revocation). All authentication-related route handlers in the `auth` blueprint delegate to functions in this module. The service uses PyJWT for token encoding and decoding, and `werkzeug.security` for password hashing and verification.
 
 `Source: services/auth_service.py`
 
@@ -256,7 +256,7 @@ def authenticate(email: str, password: str) -> dict | None
 | Parameter | Type | Required | Description |
 |---|---|---|---|
 | `email` | `str` | Yes | User's email address. |
-| `password` | `str` | Yes | User's plain-text password to verify against the stored bcrypt hash. |
+| `password` | `str` | Yes | User's plain-text password to verify against the stored password hash using `werkzeug.security.check_password_hash()`. |
 
 **Returns:** `dict | None` — Serialized user object if credentials are valid and the account is active, `None` if authentication fails.
 
@@ -366,6 +366,39 @@ if payload:
     # payload contains: {"sub": 1, "role": "admin", "type": "access", "iat": ..., "exp": ...}
 else:
     print("Token is invalid or expired")
+```
+
+### logout
+
+Revokes a refresh token by removing it from the database. After a successful logout, the refresh token can no longer be used to generate new access tokens. The function locates the refresh token record in the database, deletes it, and commits the transaction. If the provided token does not exist or has already been revoked, a `ValueError` is raised.
+
+```python
+def logout(refresh_token: str) -> None
+```
+
+**Parameters:**
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `refresh_token` | `str` | Yes | The refresh token string to revoke. Must match an existing token in the `refresh_tokens` table. |
+
+**Returns:** `None` — The function has no return value. A successful call means the token has been revoked.
+
+**Raises:**
+
+| Exception | Condition |
+|---|---|
+| `ValueError` | The provided refresh token does not exist in the database or has already been revoked |
+
+**Example:**
+
+```python
+from services.auth_service import logout
+
+# Revoke a refresh token on user logout
+logout(refresh_token="eyJhbGciOiJIUzI1NiIs...")
+# The refresh token is now deleted from the database
+# and can no longer be used to obtain new access tokens.
 ```
 
 ## Resource Service
@@ -601,7 +634,7 @@ Services use two standard Python exception types to signal error conditions:
 When a database operation fails due to a constraint violation (such as a unique key conflict), the service catches the SQLAlchemy exception, rolls back the transaction to restore the session to a clean state, and re-raises the error as a `ValueError` with a descriptive message. This pattern ensures that the database session is never left in a broken state.
 
 ```python
-import bcrypt
+from werkzeug.security import generate_password_hash
 from sqlalchemy.exc import IntegrityError
 from extensions import db
 from models.user import User
@@ -609,7 +642,7 @@ from models.user import User
 
 def create_user(email: str, name: str, password: str, role: str = "user") -> dict:
     try:
-        password_hash = bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
+        password_hash = generate_password_hash(password)
         user = User(email=email, name=name, password_hash=password_hash, role=role)
         db.session.add(user)
         db.session.commit()
