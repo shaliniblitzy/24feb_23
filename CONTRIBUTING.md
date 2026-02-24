@@ -349,7 +349,7 @@ load_dotenv()
 class Config:
     """Base configuration loaded from environment variables."""
 
-    SECRET_KEY = os.environ.get("SECRET_KEY", "fallback-dev-key")
+    SECRET_KEY = os.environ["SECRET_KEY"]  # Required — no fallback; set in .env file
     SQLALCHEMY_DATABASE_URI = os.environ.get("DATABASE_URL", "sqlite:///app.db")
     SQLALCHEMY_TRACK_MODIFICATIONS = False
 ```
