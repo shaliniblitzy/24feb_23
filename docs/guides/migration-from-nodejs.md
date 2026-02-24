@@ -193,7 +193,7 @@ The following table maps every Node.js package used in the original server to it
 | Node.js Package | Purpose | Python Package | Version | Notes |
 |---|---|---|---|---|
 | `express` | Web framework | `flask` | 3.1.3 | Micro-framework; uses decorators instead of method chaining |
-| `cors` / `express-cors` | CORS support | `flask-cors` | 5.0.1 | Extension wraps Flask CORS handling transparently |
+| `cors` / `express-cors` | CORS support | `flask-cors` | 6.0.2 | Extension wraps Flask CORS handling transparently |
 | `mongoose` | MongoDB ODM | `flask-sqlalchemy` | 3.1.1 | SQLAlchemy is database-agnostic; supports PostgreSQL, MySQL, SQLite |
 | `sequelize` | SQL ORM | `flask-sqlalchemy` | 3.1.1 | SQLAlchemy ORM with Flask integration and session management |
 | `knex` | SQL query builder | `sqlalchemy` (core) | via flask-sqlalchemy 3.1.1 | SQLAlchemy Core provides a composable query builder |
@@ -485,7 +485,7 @@ The following table documents common issues encountered during the migration fro
 | Route parameter syntax | `:id` (Express) vs `<id>` (Flask) | Flask uses `<type:name>` URL converters: `<int:user_id>`, `<string:slug>`, `<uuid:item_id>` |
 | Async confusion | Node.js is async by default | Flask is synchronous by default; standard SQLAlchemy calls do not require `await` |
 | Missing `body-parser` | Express requires `body-parser` for JSON | Flask parses JSON natively via `request.get_json()`; no additional package is needed |
-| CORS not working | Express `cors()` middleware vs Flask | Install and initialize `flask-cors==5.0.1`: `CORS(app)` in the application factory |
+| CORS not working | Express `cors()` middleware vs Flask | Install and initialize `flask-cors==6.0.2`: `CORS(app)` in the application factory |
 | Environment variables not loading | `process.env.VAR` vs Python | Use `python-dotenv==1.0.1` and call `load_dotenv()` before accessing `os.environ["VAR"]` |
 | Database session errors | Sequelize auto-manages connections | Flask-SQLAlchemy requires explicit `db.session.commit()` after mutations and `db.session.rollback()` on errors |
 | Test discovery not working | Jest finds `*.test.js` files | pytest discovers `test_*.py` files and `test_` prefixed functions; ensure correct naming conventions |

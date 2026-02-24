@@ -57,7 +57,7 @@ The following table lists all core technologies used in the Flask server applica
 | Framework | Flask | 3.1.3 | Web application framework |
 | ORM | SQLAlchemy | via Flask-SQLAlchemy 3.1.1 | Object-Relational Mapping for database access |
 | Database Migrations | Alembic | via Flask-Migrate 4.0.7 | Database schema migration management |
-| CORS | Flask-CORS | 5.0.1 | Cross-Origin Resource Sharing support |
+| CORS | Flask-CORS | 6.0.2 | Cross-Origin Resource Sharing support |
 | Configuration | python-dotenv | 1.0.1 | Environment variable management from `.env` files |
 | WSGI Server | Gunicorn | 23.0.0 | Production HTTP server |
 | Testing | pytest | 8.3.4 | Test framework and runner |

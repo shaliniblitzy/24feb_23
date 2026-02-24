@@ -71,7 +71,7 @@ The `requirements.txt` file contains all dependencies with exact version pins. K
 
 ```text
 flask==3.1.3
-flask-cors==5.0.1
+flask-cors==6.0.2
 flask-sqlalchemy==3.1.1
 flask-migrate==4.0.7
 python-dotenv==1.0.1
@@ -203,8 +203,10 @@ def get_user_by_id(user_id: int) -> dict[str, str | int] | None:
     Returns:
         A dictionary containing user data, or None if not found.
     """
-    # Implementation retrieves user from database
-    ...
+    user = db.session.get(User, user_id)
+    if user is None:
+        return None
+    return {"id": user.id, "email": user.email, "name": user.name}
 ```
 
 Run type checking with:
@@ -236,7 +238,11 @@ def authenticate_user(email: str, password: str) -> dict[str, str]:
         ValueError: If the email format is invalid.
         AuthenticationError: If the credentials do not match.
     """
-    ...
+    user = User.query.filter_by(email=email).first()
+    if user is None or not check_password_hash(user.password_hash, password):
+        raise AuthenticationError("Invalid email or password")
+    token = create_access_token(user.id)
+    return {"access_token": token, "token_type": "bearer"}
 ```
 
 ### Import Ordering
@@ -281,7 +287,9 @@ auth_bp = Blueprint("auth", __name__, url_prefix="/auth")
 @auth_bp.route("/login", methods=["POST"])
 def login():
     """Handle user login requests."""
-    ...
+    data = request.get_json()
+    result = auth_service.authenticate_user(data["email"], data["password"])
+    return jsonify(result), 200
 ```
 
 - **Use the application factory pattern.** The Flask application instance must be created inside a `create_app()` factory function, never as a module-level global:
@@ -379,7 +387,7 @@ This project follows the [Conventional Commits](https://www.conventionalcommits.
 
 ### Format
 
-```
+```text
 <type>: <description>
 
 [optional body]
@@ -409,7 +417,7 @@ This project follows the [Conventional Commits](https://www.conventionalcommits.
 
 ### Examples
 
-```
+```text
 feat: add user authentication endpoint
 
 Implement POST /auth/login and POST /auth/register endpoints
@@ -418,26 +426,26 @@ using JWT tokens for session management.
 Closes #42
 ```
 
-```
+```text
 fix: resolve database connection timeout
 
 Increase SQLAlchemy pool recycle interval to 1800 seconds
 to prevent stale connections during low-traffic periods.
 ```
 
-```
+```text
 docs: update API reference for /users endpoint
 ```
 
-```
+```text
 test: add integration tests for auth service
 ```
 
-```
+```text
 refactor: extract database query logic to service layer
 ```
 
-```
+```text
 chore: update Flask to 3.1.3
 ```
 

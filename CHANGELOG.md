@@ -1,5 +1,7 @@
 # Changelog
 
+> **Last updated:** 2026-02-24
+
 All notable changes to the Flask Server project are documented in this file. This project tracks the complete rewrite of the original Node.js server application into Python 3 using the Flask web framework, preserving all original functionalities.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),

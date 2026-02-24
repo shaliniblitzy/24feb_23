@@ -30,7 +30,7 @@ Install the core application and testing packages:
 ```bash
 pip install flask==3.1.3
 pip install flask-sqlalchemy==3.1.1
-pip install flask-cors==5.0.1
+pip install flask-cors==6.0.2
 pip install flask-migrate==4.0.7
 pip install python-dotenv==1.0.1
 pip install pytest==8.3.4
@@ -47,7 +47,7 @@ pip install -r requirements.txt
 
 All test files reside in the `tests/` directory at the project root. The directory is organized by the module or layer under test:
 
-```
+```text
 tests/
 ├── conftest.py          # Shared fixtures (app, client, db_session)
 ├── test_auth.py         # Authentication endpoint tests

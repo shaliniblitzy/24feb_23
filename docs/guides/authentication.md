@@ -466,11 +466,11 @@ if response.status_code == 401:
             new_token = refresh_response.json()["access_token"]
             # Retry the original request with the new token
         else:
-            # Redirect user to login
-            pass
+            print(f"Token refresh failed: {refresh_response.status_code}")
+            print("Redirecting user to login page")
 elif response.status_code == 403:
-    # User does not have the required role
-    pass
+    print(f"Access denied: user does not have the required role")
+    print(f"Response: {response.json()}")
 ```
 
 ## Password Hashing

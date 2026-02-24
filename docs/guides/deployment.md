@@ -10,7 +10,7 @@ Flask's built-in development server (`flask run`) is designed for local developm
 
 The production deployment stack follows a layered architecture:
 
-```
+```text
 Client → Reverse Proxy (Nginx) → WSGI Server (Gunicorn) → Flask Application → Database
 ```
 
@@ -41,7 +41,7 @@ pip install gunicorn==23.0.0
 pip install flask==3.1.3
 pip install flask-sqlalchemy==3.1.1
 pip install flask-migrate==4.0.7
-pip install flask-cors==5.0.1
+pip install flask-cors==6.0.2
 pip install python-dotenv==1.0.1
 ```
 
@@ -204,7 +204,7 @@ services:
       - "8000:8000"
     environment:
       - FLASK_ENV=production
-      - DATABASE_URL=postgresql://user:pass@db:5432/flaskdb
+      - DATABASE_URL=postgresql://${DB_USER}:${DB_PASSWORD}@db:5432/${DB_NAME}
       - SECRET_KEY=${SECRET_KEY}
     depends_on:
       - db
@@ -213,9 +213,9 @@ services:
   db:
     image: postgres:16-alpine
     environment:
-      - POSTGRES_USER=user
-      - POSTGRES_PASSWORD=pass
-      - POSTGRES_DB=flaskdb
+      - POSTGRES_USER=${DB_USER}
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
+      - POSTGRES_DB=${DB_NAME}
     volumes:
       - pgdata:/var/lib/postgresql/data
     restart: unless-stopped
@@ -224,11 +224,22 @@ volumes:
   pgdata:
 ```
 
+> **Important:** Never hardcode database credentials in `docker-compose.yml`. Create a `.env` file in the same directory with the required values:
+>
+> ```dotenv
+> DB_USER=your_db_user
+> DB_PASSWORD=your_secure_password
+> DB_NAME=flaskdb
+> SECRET_KEY=your-secret-key-here
+> ```
+>
+> Docker Compose automatically loads variables from a `.env` file in the project root. Add `.env` to `.gitignore` to prevent credentials from being committed to version control.
+
 **Configuration notes:**
 
 - The `web` service builds the Flask application from the Dockerfile in the current directory and maps port 8000.
 - The `db` service runs PostgreSQL 16 on Alpine Linux, storing data in a named Docker volume (`pgdata`) for persistence across container restarts.
-- The `SECRET_KEY` is loaded from the host environment or a `.env` file, keeping secrets out of version control.
+- All credentials are loaded from environment variables defined in a `.env` file, keeping secrets out of version control.
 - `depends_on` ensures the database container starts before the web container, though the application should still implement retry logic for database connections.
 - `restart: unless-stopped` ensures containers automatically restart after failures or host reboots, unless explicitly stopped by an operator.
 

@@ -89,9 +89,9 @@ pip install -r requirements.txt
 
 The `requirements.txt` includes all pinned dependencies. Key packages installed:
 
-```
+```text
 flask==3.1.3
-flask-cors==5.0.1
+flask-cors==6.0.2
 flask-sqlalchemy==3.1.1
 flask-migrate==4.0.7
 python-dotenv==1.0.1
@@ -169,7 +169,7 @@ Example response:
 
 ## Project Structure
 
-```
+```text
 flask-server/
 ├── app.py                  # Application entry point and factory
 ├── config.py               # Configuration management
@@ -250,4 +250,4 @@ Please read the [Contributing Guide](CONTRIBUTING.md) for detailed instructions 
 
 ## License
 
-This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
+This project is licensed under the MIT License.
