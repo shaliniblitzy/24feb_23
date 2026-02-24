@@ -1,0 +1,61 @@
+# MkDocs Configuration for Flask Server Documentation
+# Documentation site: https://example.com/flask-server
+# Build command: mkdocs build --strict
+# Preview command: mkdocs serve --dev-addr 127.0.0.1:8000
+
+site_name: Flask Server
+site_description: >-
+  Comprehensive documentation for the Flask Server application — a Python 3 web
+  server built with Flask that serves as a complete rewrite of the original
+  Node.js server, preserving all original functionalities with full feature parity.
+site_url: https://example.com/flask-server
+
+theme:
+  name: material
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.expand
+    - navigation.top
+    - search.highlight
+    - search.suggest
+    - content.tabs.link
+    - content.code.copy
+  palette:
+    - scheme: default
+      primary: blue
+      accent: indigo
+
+nav:
+  - Home: index.md
+  - Getting Started:
+      - Installation: getting-started/installation.md
+      - Configuration: getting-started/configuration.md
+      - Quickstart: getting-started/quickstart.md
+  - Guides:
+      - Migration from Node.js: guides/migration-from-nodejs.md
+      - Authentication: guides/authentication.md
+      - Database: guides/database.md
+      - Testing: guides/testing.md
+      - Deployment: guides/deployment.md
+  - API Reference:
+      - Endpoints: api-reference/endpoints.md
+      - Models: api-reference/models.md
+      - Services: api-reference/services.md
+  - Architecture:
+      - Overview: architecture/overview.md
+      - Request Lifecycle: architecture/request-lifecycle.md
+      - Data Flow: architecture/data-flow.md
+
+plugins:
+  - search
+  - mermaid2
+
+markdown_extensions:
+  - tables
+  - fenced_code
+  - codehilite
+  - admonition
+  - toc:
+      permalink: true
+  - attr_list
