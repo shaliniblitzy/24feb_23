@@ -1,6 +1,6 @@
-*Last updated: 2026-02-24*
-
 # Configuration
+
+*Last updated: 2026-02-24*
 
 This guide documents every environment variable, configuration file, and application setting used by the Flask server application. It covers the `.env` file format, the configuration class hierarchy, required versus optional settings, and secret key generation. Read this guide after completing the [Installation Guide](installation.md) and before proceeding to the [Quickstart Guide](quickstart.md).
 
@@ -26,7 +26,7 @@ load_dotenv()
 
 class Config:
     """Base configuration."""
-    SECRET_KEY = os.environ.get("SECRET_KEY", "default-secret-key")
+    SECRET_KEY = os.environ["SECRET_KEY"]  # Required — must be set in environment or .env file
     SQLALCHEMY_DATABASE_URI = os.environ.get("DATABASE_URL", "sqlite:///app.db")
     SQLALCHEMY_TRACK_MODIFICATIONS = False
 ```

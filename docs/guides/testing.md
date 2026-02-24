@@ -577,7 +577,7 @@ pytest --cov=app --cov-fail-under=80
 
 The `--cov-fail-under=80` flag causes pytest to exit with a non-zero status code if overall coverage falls below 80%, making it suitable for continuous integration pipelines that must block merges when coverage regresses.
 
-See [Contributing Guide](../../CONTRIBUTING.md) for team testing requirements and PR review expectations.
+See the Contributing Guide (`CONTRIBUTING.md` in the project root) for team testing requirements and PR review expectations.
 
 ## Troubleshooting
 
@@ -595,6 +595,6 @@ This section documents common issues encountered when setting up or running the 
 
 ## See Also
 
-- [Contributing Guide](../../CONTRIBUTING.md) — Testing requirements for contributions, PR checklist, and quality standards
+- Contributing Guide (`CONTRIBUTING.md` in the project root) — Testing requirements for contributions, PR checklist, and quality standards
 - [API Reference](../api-reference/endpoints.md) — Complete REST API endpoint catalog for writing targeted API tests
 - [Architecture Overview](../architecture/overview.md) — System component structure, layered architecture, and glossary of standard terminology

@@ -10,6 +10,8 @@ flask-sqlalchemy==3.1.1
 flask-migrate==4.0.7
 python-dotenv==1.0.1
 gunicorn==23.0.0
+pyjwt==2.11.0
+bcrypt==4.2.1
 
 # Testing dependencies
 pytest==8.3.4

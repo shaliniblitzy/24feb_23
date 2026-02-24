@@ -145,15 +145,16 @@ Expected response:
 ```json
 {
   "status": "healthy",
-  "version": "0.1.0"
+  "database": "connected",
+  "timestamp": "2026-02-24T12:00:00+00:00"
 }
 ```
 
 ### Make your first API call
 
 ```bash
-curl -X GET http://localhost:5000/api/v1/users \
-  -H "Content-Type: application/json"
+curl -X GET http://localhost:5000/api/users/ \
+  -H "Authorization: Bearer <access_token>"
 ```
 
 Example response:
@@ -163,7 +164,7 @@ Example response:
   "data": [],
   "total": 0,
   "page": 1,
-  "per_page": 20
+  "pages": 0
 }
 ```
 
@@ -210,9 +211,9 @@ The Flask server exposes a RESTful API organized into the following endpoint gro
 | Endpoint Group | Base Path | Description |
 |---|---|---|
 | Health | `/health` | Server health check and status |
-| Authentication | `/api/v1/auth` | Login, logout, token refresh, and registration |
-| Users | `/api/v1/users` | User CRUD operations and profile management |
-| Resources | `/api/v1/resources` | Core resource management endpoints |
+| Authentication | `/api/auth` | Login, logout, token refresh, and registration |
+| Users | `/api/users` | User CRUD operations and profile management |
+| Resources | `/api/resources` | Core resource management endpoints |
 
 All endpoints return JSON responses and use standard HTTP status codes. Authentication-protected endpoints require a valid bearer token in the `Authorization` header.
 
@@ -225,7 +226,7 @@ Comprehensive project documentation is available in the `docs/` directory and ca
 ### Build and serve documentation locally
 
 ```bash
-pip install mkdocs==1.6.1 mkdocs-material==9.7.2 mkdocs-mermaid2-plugin==1.1.1
+pip install mkdocs==1.6.1 mkdocs-material==9.7.2 mkdocs-mermaid2-plugin==1.2.3
 mkdocs serve --dev-addr 127.0.0.1:8000
 ```
 

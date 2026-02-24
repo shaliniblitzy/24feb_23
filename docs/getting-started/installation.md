@@ -1,6 +1,6 @@
-*Last updated: 2026-02-24*
-
 # Installation
+
+*Last updated: 2026-02-24*
 
 This guide covers everything needed to set up a local development environment for the Flask server application. It walks through Python installation, virtual environment creation, dependency installation with pinned versions, and verification steps to confirm a working setup. Whether you are joining the project for the first time or setting up a fresh machine, follow each section in order to have a fully functional development environment.
 
@@ -161,11 +161,13 @@ If you need to install dependencies individually — for example, when adding a 
 
 ```bash
 pip install flask==3.1.3
-pip install flask-cors==5.0.1
+pip install flask-cors==6.0.2
 pip install flask-sqlalchemy==3.1.1
 pip install flask-migrate==4.0.7
 pip install python-dotenv==1.0.1
 pip install gunicorn==23.0.0
+pip install pyjwt==2.11.0
+pip install bcrypt==4.2.1
 ```
 
 **Testing dependencies:**
@@ -179,7 +181,7 @@ pip install pytest==8.3.4
 ```bash
 pip install mkdocs==1.6.1
 pip install mkdocs-material==9.7.2
-pip install mkdocs-mermaid2-plugin==1.1.1
+pip install mkdocs-mermaid2-plugin==1.2.3
 ```
 
 ### Dependency Reference
@@ -189,15 +191,17 @@ The table below provides a complete summary of all project dependencies, their p
 | Package | Version | Purpose |
 |---|---|---|
 | flask | 3.1.3 | Core web application framework |
-| flask-cors | 5.0.1 | Cross-Origin Resource Sharing support |
+| flask-cors | 6.0.2 | Cross-Origin Resource Sharing support |
 | flask-sqlalchemy | 3.1.1 | SQLAlchemy ORM integration for Flask |
 | flask-migrate | 4.0.7 | Database schema migration with Alembic |
 | python-dotenv | 1.0.1 | Environment variable loading from `.env` files |
 | gunicorn | 23.0.0 | Production WSGI HTTP server |
+| pyjwt | 2.11.0 | JSON Web Token encoding and decoding for authentication |
+| bcrypt | 4.2.1 | Password hashing library for secure credential storage |
 | pytest | 8.3.4 | Python test framework |
 | mkdocs | 1.6.1 | Static site documentation generator |
 | mkdocs-material | 9.7.2 | Material Design theme for MkDocs |
-| mkdocs-mermaid2-plugin | 1.1.1 | Mermaid diagram rendering in docs |
+| mkdocs-mermaid2-plugin | 1.2.3 | Mermaid diagram rendering in docs |
 
 ## Verifying the Installation
 

@@ -29,10 +29,10 @@ The User Service provides business logic for user management, including CRUD ope
 
 ### create_user
 
-Creates a new user record in the database after validating that the email address is unique and all input constraints are satisfied.
+Creates a new user record in the database after validating that the email address is unique, hashing the password with bcrypt, and verifying that all input constraints are satisfied.
 
 ```python
-def create_user(email: str, name: str, role: str = "user") -> dict
+def create_user(email: str, name: str, password: str, role: str = "user") -> dict
 ```
 
 **Parameters:**
@@ -41,9 +41,10 @@ def create_user(email: str, name: str, role: str = "user") -> dict
 |---|---|---|---|---|
 | `email` | `str` | Yes | — | User's email address. Must be unique across all users. |
 | `name` | `str` | Yes | — | User's display name. Maximum 255 characters. |
+| `password` | `str` | Yes | — | User's plain-text password. Minimum 8 characters. Hashed with bcrypt before storage. |
 | `role` | `str` | No | `"user"` | User role. Valid values: `"user"`, `"admin"`. |
 
-**Returns:** `dict` — Serialized user object containing `id`, `email`, `name`, `role`, `is_active`, `created_at`, and `updated_at` fields. See the [User model serialization](models.md#serialization) for the complete field list.
+**Returns:** `dict` — Serialized user object containing `id`, `email`, `name`, `role`, `is_active`, `created_at`, and `updated_at` fields. The `password_hash` field is excluded from the serialized output. See the [User model serialization](models.md#serialization) for the complete field list.
 
 **Raises:**
 
@@ -52,13 +53,19 @@ def create_user(email: str, name: str, role: str = "user") -> dict
 | `ValueError` | Email is already registered in the database |
 | `ValueError` | Email format is invalid |
 | `ValueError` | Name exceeds 255 characters |
+| `ValueError` | Password is shorter than 8 characters |
 
 **Example:**
 
 ```python
 from services.user_service import create_user
 
-user = create_user(email="alice@example.com", name="Alice", role="user")
+user = create_user(
+    email="alice@example.com",
+    name="Alice",
+    password="securepassword123",
+    role="user",
+)
 # Returns:
 # {
 #     "id": 1,
@@ -69,6 +76,7 @@ user = create_user(email="alice@example.com", name="Alice", role="user")
 #     "created_at": "2026-02-24T10:30:00+00:00",
 #     "updated_at": "2026-02-24T10:30:00+00:00"
 # }
+# Note: password_hash is NOT included in the returned dictionary.
 ```
 
 ### get_user_by_id
@@ -134,6 +142,8 @@ def get_all_users(page: int = 1, per_page: int = 20) -> dict
 | `total` | `int` | Total number of user records across all pages |
 | `page` | `int` | Current page number |
 | `pages` | `int` | Total number of pages |
+
+> **Note:** The service returns user records under the `users` key. The route handler in the presentation layer transforms this to a `data` key in the HTTP response to conform to the API's standard response envelope. See the [Endpoints Reference](endpoints.md) for the final HTTP response format.
 
 **Example:**
 
@@ -369,7 +379,7 @@ The Resource Service manages application resources (items, posts, or other domai
 Creates a new resource record in the database, associated with the specified owner. Validates that the owner exists and that the resource name is not empty before persisting the record.
 
 ```python
-def create_resource(name: str, description: str, owner_id: int) -> dict
+def create_resource(name: str, description: str, owner_id: int, is_public: bool = False) -> dict
 ```
 
 **Parameters:**
@@ -379,8 +389,9 @@ def create_resource(name: str, description: str, owner_id: int) -> dict
 | `name` | `str` | Yes | — | Resource name. Maximum 255 characters. Must not be empty. |
 | `description` | `str` | Yes | — | Detailed description of the resource. Pass an empty string if no description is needed. |
 | `owner_id` | `int` | Yes | — | ID of the user who owns this resource. Must reference an existing user. |
+| `is_public` | `bool` | No | `False` | Whether the resource is publicly visible. When `True`, the resource can be viewed by any authenticated user; when `False`, only the owner can access it. |
 
-**Returns:** `dict` — Serialized resource object containing `id`, `name`, `description`, `owner_id`, `is_public`, `created_at`, and `updated_at` fields. See the [Resource model serialization](models.md#serialization-1) for the complete field list.
+**Returns:** `dict` — Serialized resource object containing `id`, `name`, `description`, `owner_id`, `is_public`, `created_at`, and `updated_at` fields. See the [Resource model serialization](models.md#serialization_1) for the complete field list.
 
 **Raises:**
 
@@ -398,6 +409,7 @@ resource = create_resource(
     name="Project Alpha",
     description="A sample project resource",
     owner_id=1,
+    is_public=True,
 )
 # Returns:
 # {
@@ -405,7 +417,7 @@ resource = create_resource(
 #     "name": "Project Alpha",
 #     "description": "A sample project resource",
 #     "owner_id": 1,
-#     "is_public": False,
+#     "is_public": True,
 #     "created_at": "2026-02-24T10:30:00+00:00",
 #     "updated_at": "2026-02-24T10:30:00+00:00"
 # }
@@ -474,6 +486,8 @@ def get_all_resources(page: int = 1, per_page: int = 20) -> dict
 | `total` | `int` | Total number of resource records across all pages |
 | `page` | `int` | Current page number |
 | `pages` | `int` | Total number of pages |
+
+> **Note:** The service returns resource records under the `resources` key. The route handler in the presentation layer transforms this to a `data` key in the HTTP response to conform to the API's standard response envelope. See the [Endpoints Reference](endpoints.md) for the final HTTP response format.
 
 **Example:**
 
@@ -587,14 +601,16 @@ Services use two standard Python exception types to signal error conditions:
 When a database operation fails due to a constraint violation (such as a unique key conflict), the service catches the SQLAlchemy exception, rolls back the transaction to restore the session to a clean state, and re-raises the error as a `ValueError` with a descriptive message. This pattern ensures that the database session is never left in a broken state.
 
 ```python
+import bcrypt
 from sqlalchemy.exc import IntegrityError
 from extensions import db
 from models.user import User
 
 
-def create_user(email: str, name: str, role: str = "user") -> dict:
+def create_user(email: str, name: str, password: str, role: str = "user") -> dict:
     try:
-        user = User(email=email, name=name, role=role)
+        password_hash = bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
+        user = User(email=email, name=name, password_hash=password_hash, role=role)
         db.session.add(user)
         db.session.commit()
         return user.to_dict()

@@ -1,6 +1,6 @@
-*Last updated: 2026-02-24*
-
 # Quickstart
+
+*Last updated: 2026-02-24*
 
 This guide walks you through starting the Flask server for the first time, verifying that it is running correctly with a health check, and making your first API call. It is intended for developers who have already completed the [Installation Guide](installation.md) and the [Configuration Guide](configuration.md) and are ready to launch the application and interact with it.
 
@@ -72,22 +72,23 @@ After starting the server, verify that it is running correctly by calling the he
 
 ### Health Check Endpoint
 
-The Flask server exposes a `/health` endpoint that returns the application's status and version. Use `curl` to send a request from a new terminal window:
+The Flask server exposes a `/health` endpoint that returns the application's health status, database connectivity, and a timestamp. Use `curl` to send a request from a new terminal window:
 
 ```bash
 curl http://localhost:5000/health
 ```
 
-You should receive a JSON response confirming that the server is healthy:
+You should receive a JSON response confirming that the server is healthy and the database is connected:
 
 ```json
 {
   "status": "healthy",
-  "version": "0.1.0"
+  "database": "connected",
+  "timestamp": "2026-02-24T12:00:00+00:00"
 }
 ```
 
-A `200 OK` status code with `"status": "healthy"` confirms that the server is running and able to process requests. If the command fails with a "Connection refused" error, verify that the server process is still running in the other terminal window.
+A `200 OK` status code with `"status": "healthy"` and `"database": "connected"` confirms that the server is running and can reach the database. If the command fails with a "Connection refused" error, verify that the server process is still running in the other terminal window.
 
 ### Using Python
 
@@ -98,63 +99,99 @@ import requests
 
 response = requests.get("http://localhost:5000/health")
 print(response.status_code)  # 200
-print(response.json())       # {"status": "healthy", "version": "0.1.0"}
+print(response.json())       # {"status": "healthy", "database": "connected", "timestamp": "..."}
 ```
 
 This approach is useful when scripting automated health checks or integrating with monitoring tools. The `requests` library is not a project dependency by default — install it with `pip install requests==2.32.3` if it is not already available in your environment.
 
 ## Making Your First API Call
 
-With the server verified, you can now interact with the REST API endpoints. The examples below demonstrate listing resources and creating a new resource using the API.
+With the server verified, you can now interact with the REST API endpoints. The examples below demonstrate registering a user account, listing users, and creating a resource using the API.
 
-### Example: List Resources
+### Example: Register a User
 
-Send a `GET` request to the users endpoint to retrieve a paginated list of users:
+Send a `POST` request to the registration endpoint to create a new user account. This endpoint does not require authentication:
 
 ```bash
-curl -X GET http://localhost:5000/api/v1/users \
-  -H "Content-Type: application/json"
+curl -X POST http://localhost:5000/api/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"name": "Jane Doe", "email": "jane@example.com", "password": "securepassword123"}'
 ```
 
-On a freshly initialized database with no user records, the expected response is an empty data array with pagination metadata:
+On success, the server responds with the newly created user object and a `201 Created` status code:
 
 ```json
 {
-  "data": [],
-  "pagination": {
-    "page": 1,
-    "per_page": 20,
-    "total": 0
-  }
+  "id": 1,
+  "email": "jane@example.com",
+  "name": "Jane Doe",
+  "role": "user",
+  "is_active": true,
+  "created_at": "2026-02-24T12:00:00+00:00",
+  "updated_at": "2026-02-24T12:00:00+00:00"
 }
 ```
 
-The `pagination` object indicates the current page number, the number of items per page, and the total count of records. As you add users, the `data` array and `total` count will reflect the stored records.
+The `id` field is assigned automatically by the database. The response contains the full representation of the created user, excluding the password hash for security.
+
+### Example: List Users
+
+To access protected endpoints, first log in to obtain an access token, then send a `GET` request to the users endpoint with the token in the `Authorization` header:
+
+```bash
+curl -X GET "http://localhost:5000/api/users/?page=1&per_page=20" \
+  -H "Authorization: Bearer <access_token>"
+```
+
+The response includes a paginated list of users with flat pagination metadata:
+
+```json
+{
+  "data": [
+    {
+      "id": 1,
+      "email": "jane@example.com",
+      "name": "Jane Doe",
+      "role": "user",
+      "is_active": true,
+      "created_at": "2026-02-24T12:00:00+00:00",
+      "updated_at": "2026-02-24T12:00:00+00:00"
+    }
+  ],
+  "total": 1,
+  "page": 1,
+  "pages": 1
+}
+```
+
+The `total` field indicates the total count of records, `page` is the current page number, and `pages` is the total number of pages. As you add users, these values will update accordingly.
 
 ### Example: Create a Resource
 
-Send a `POST` request to create a new user record:
+Send an authenticated `POST` request to create a new resource:
 
 ```bash
-curl -X POST http://localhost:5000/api/v1/users \
+curl -X POST http://localhost:5000/api/resources/ \
   -H "Content-Type: application/json" \
-  -d '{"name": "Jane Doe", "email": "jane@example.com"}'
+  -H "Authorization: Bearer <access_token>" \
+  -d '{"name": "Project Alpha", "description": "A sample project resource", "is_public": true}'
 ```
 
-On success, the server responds with the newly created user object and a confirmation message:
+On success, the server responds with the newly created resource and a `201 Created` status code:
 
 ```json
 {
-  "data": {
-    "id": 1,
-    "name": "Jane Doe",
-    "email": "jane@example.com"
-  },
-  "message": "User created successfully"
+  "id": 1,
+  "name": "Project Alpha",
+  "description": "A sample project resource",
+  "is_public": true,
+  "owner_id": 1,
+  "created_at": "2026-02-24T12:00:00+00:00",
+  "updated_at": "2026-02-24T12:00:00+00:00"
 }
 ```
 
-The `id` field is assigned automatically by the database. The `data` object contains the full representation of the created resource, and the `message` field provides a human-readable confirmation of the operation.
+The `owner_id` is automatically set to the authenticated user's ID based on the JWT token.
 
 For a complete catalog of all available endpoints, including authentication, resource management, and detailed request/response schemas, see the [API Reference](../api-reference/endpoints.md).
 
