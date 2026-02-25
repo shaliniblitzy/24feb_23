@@ -1,0 +1,43 @@
+# Ruff linter and formatter configuration
+# Per AAP §0.7.3: "PEP 8 compliance enforced via Ruff"
+# All source files must pass `ruff check` with zero violations.
+
+# Target Python version — Python 3.14 runtime per AAP §0.6.1
+target-version = "py314"
+
+# Line length — must match black configuration (100 characters)
+# Per AAP §0.7.3: "Black formatting enforced — all source files must be formatted with black (line length 100)"
+line-length = 100
+
+# Source paths for first-party import resolution
+src = ["app", "tests", "scripts"]
+
+[lint]
+# Selected rule sets per AAP §0.6.1:
+# E  — pycodestyle errors (PEP 8 style violations)
+# F  — pyflakes (logical errors, unused imports/variables)
+# W  — pycodestyle warnings (whitespace, deprecated features)
+# I  — isort (import sorting and grouping)
+# N  — pep8-naming (naming convention enforcement)
+# UP — pyupgrade (automatic upgrade to modern Python syntax)
+select = [
+    "E",
+    "F",
+    "W",
+    "I",
+    "N",
+    "UP",
+]
+
+# Explicit empty ignore list — no rules are suppressed
+ignore = []
+
+[lint.isort]
+# Classify the application package as first-party for correct import grouping
+known-first-party = ["app"]
+
+[format]
+# Double quotes per Python community convention
+quote-style = "double"
+# Space-based indentation (PEP 8 standard)
+indent-style = "space"
