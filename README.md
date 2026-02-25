@@ -1,254 +1,483 @@
-# Flask Server
+# Flask Backend API Server
 
-> **Last updated:** 2026-02-24
-
-A production-ready Python 3 web server built with Flask that serves as a complete rewrite of the original Node.js server application, preserving all original functionalities with full feature parity. This project replaces the Express.js-based server with a modern Flask application, leveraging Python's ecosystem for routing, authentication, database access, and deployment.
-
-![Python](https://img.shields.io/badge/Python-3.9%2B-blue?logo=python&logoColor=white)
-![Flask](https://img.shields.io/badge/Flask-3.1.x-green?logo=flask&logoColor=white)
+![Python](https://img.shields.io/badge/Python-3.14.3-blue?logo=python&logoColor=white)
+![Flask](https://img.shields.io/badge/Flask-3.1.3-green?logo=flask&logoColor=white)
 ![License](https://img.shields.io/badge/License-MIT-yellow)
+
+A production-ready Python 3 / Flask backend API server implementing Auth0 authentication, MongoDB persistence, LangChain AI orchestration with multi-provider fallback, and AWS S3 file operations. Designed to serve six client platform types (React Web, React Native Mobile, Electron Desktop, iOS/Swift, Android/Kotlin, macOS/Objective-C) via a unified REST API.
+
+---
 
 ## Table of Contents
 
-- [Technology Stack](#technology-stack)
-- [Features](#features)
+- [Architecture Overview](#architecture-overview)
+- [Tech Stack](#tech-stack)
 - [Prerequisites](#prerequisites)
-- [Installation](#installation)
-- [Quickstart](#quickstart)
+- [Getting Started](#getting-started)
+- [Docker Development Workflow](#docker-development-workflow)
+- [Running Tests](#running-tests)
+- [API Endpoint Reference](#api-endpoint-reference)
+- [Environment Variables Reference](#environment-variables-reference)
+- [Deployment Guide](#deployment-guide)
 - [Project Structure](#project-structure)
-- [API Overview](#api-overview)
-- [Documentation](#documentation)
-- [Contributing](#contributing)
-- [License](#license)
+- [Contributing Guidelines](#contributing-guidelines)
 
-## Technology Stack
+---
 
-| Component | Technology | Version |
+## Architecture Overview
+
+The backend enforces a **strict layered architecture** with unidirectional data flow. Every API request passes through the layers in sequence — no layer may be bypassed.
+
+```mermaid
+flowchart LR
+    Client["Client Apps<br/>(Web, Mobile, Desktop)"] -->|"HTTPS REST + JWT"| MW["JWT Middleware"]
+    MW -->|"Validated Request"| RH["Route Handlers<br/>(Flask Blueprints)"]
+    RH -->|"Validated Payload"| SL["Service Layer"]
+    SL -->|"CRUD Operations"| RL["Repository Layer"]
+    SL -->|"AI Requests"| LC["LangChain Engine"]
+    SL -->|"File Operations"| S3["AWS S3 (boto3)"]
+    RL -->|"BSON / TLS"| DB["MongoDB 8.0.x"]
+    LC -->|"HTTPS API"| LLM["LLM Providers<br/>(OpenAI, Anthropic, Google)"]
+```
+
+### Layered Architecture Flow
+
+```
+JWT Verification Middleware → Route Handlers → Service Layer → Repository Layer → MongoDB
+                                                    ↕
+                                              LangChain Engine → LLM Providers
+                                                    ↕
+                                              AWS S3 (boto3)
+```
+
+**Key architectural principles:**
+
+- **JWT Verification Middleware** — Enforces a 6-step validation pipeline on every protected request: token presence → RS256 signature via JWKS → issuer → audience → expiration → RBAC permissions.
+- **Route Handlers** — Flask Blueprints organized by domain concern (health, auth, documents, ai, files). Each Blueprint validates incoming request payloads using Pydantic before delegating to the Service Layer.
+- **Service Layer** — Encapsulates all business logic, orchestrates between the Repository Layer and external integrations (LangChain, S3), and manages transaction boundaries.
+- **Repository Layer** — Sole pathway to MongoDB. All database operations go through repository classes using PyMongo — no direct database calls are permitted elsewhere.
+- **LangChain Engine** — Operates as a parallel service within the Service Layer, handling AI/LLM orchestration with a 3-tier provider fallback strategy (Primary → Secondary → Tertiary → 503).
+
+**Application Factory Pattern:** The Flask application is created via the `create_app(config_name)` factory function, enabling modular configuration, testability with different settings, and prevention of circular imports.
+
+---
+
+## Tech Stack
+
+| Component | Version | Purpose |
 |---|---|---|
-| Language | Python | 3.9+ |
-| Web Framework | Flask | 3.1.x |
-| ORM | SQLAlchemy (via Flask-SQLAlchemy) | 3.1.x |
-| Database Migrations | Flask-Migrate (Alembic) | 4.0.x |
-| CORS | Flask-CORS | 5.0.x |
-| WSGI Server | Gunicorn | 23.x |
-| Environment Management | python-dotenv | 1.0.x |
-| Testing | pytest | 8.3.x |
+| **Python** | 3.14.3 | Runtime |
+| **Flask** | 3.1.3 | Web framework (Application Factory + Blueprints) |
+| **MongoDB** | 8.0.x | Document database |
+| **PyMongo** | ~4.x | MongoDB driver (Repository Pattern) |
+| **Auth0 + authlib** | ~1.x | JWT RS256 verification, OAuth 2.0 / OIDC |
+| **LangChain** | ~1.2.10 | AI/LLM orchestration with multi-provider fallback |
+| **LangChain-Core** | ~1.2.15 | LangChain core primitives |
+| **Pydantic** | ~2.x | Request/response schema validation |
+| **Gunicorn** | ~25.x | Production WSGI HTTP server |
+| **flask-cors** | ~6.x | Cross-Origin Resource Sharing |
+| **boto3** | ~1.42 | AWS SDK for S3 file operations |
+| **python-dotenv** | ~1.x | Environment variable loading |
+| **Docker** | — | Multi-stage container builds |
+| **GitHub Actions** | — | CI/CD pipeline (7 stages) |
+| **ruff** | ~0.15 | Linter (dev) |
+| **black** | ~26.x | Code formatter (dev) |
+| **pytest** | ~9.x | Test framework (dev) |
 
-## Features
-
-- **REST API Endpoints** — Complete set of RESTful endpoints organized into Flask blueprints, mirroring all original Node.js Express routes
-- **Authentication and Authorization** — Secure token-based authentication with role-based access control, implemented through Flask before-request hooks and decorators
-- **Database Integration** — Full SQLAlchemy ORM integration via Flask-SQLAlchemy for robust, Pythonic database access with connection pooling and session management
-- **Database Migrations** — Version-controlled schema migrations powered by Flask-Migrate and Alembic, supporting upgrade and downgrade operations
-- **CORS Support** — Cross-Origin Resource Sharing configuration via Flask-CORS, preserving the same CORS policies from the original server
-- **Request Logging** — Structured request and response logging with configurable log levels and output formats
-- **Error Handling** — Centralized error handling with consistent JSON error responses and appropriate HTTP status codes
-- **Configuration Management** — Environment-based configuration using python-dotenv, supporting development, staging, and production profiles
+---
 
 ## Prerequisites
 
-Ensure the following tools are installed on your system before proceeding:
+Before setting up the project, ensure the following are installed or available:
 
-| Tool | Minimum Version | Purpose |
+- **Python 3.14.3** — [Installation guide](https://www.python.org/downloads/)
+- **Docker & Docker Compose** — For containerized development and deployment
+- **MongoDB 8.0.17+** — Or use the included `docker-compose.yml` (recommended)
+- **Auth0 account** — With an API application configured for JWT issuance
+- **AWS account** — For S3 bucket access (file upload/download operations)
+- **LLM provider API keys** — At least one of: OpenAI, Anthropic, or Google
+
+---
+
+## Getting Started
+
+### Local Development Setup
+
+1. **Clone the repository:**
+
+   ```bash
+   git clone <repository-url>
+   cd <repository-name>
+   ```
+
+2. **Configure environment variables:**
+
+   ```bash
+   cp .env.example .env
+   # Edit .env and fill in all required values (see Environment Variables Reference below)
+   ```
+
+3. **Create and activate a virtual environment:**
+
+   ```bash
+   python3.14 -m venv .venv
+   source .venv/bin/activate
+   ```
+
+4. **Install dependencies:**
+
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+5. **Initialize the database** (if running MongoDB locally):
+
+   ```bash
+   python scripts/init_db.py
+   python scripts/seed_data.py  # Optional: load sample development data
+   ```
+
+6. **Run the Flask development server:**
+
+   ```bash
+   python run.py
+   ```
+
+   The API will be available at `http://localhost:5000`.
+
+### Quick Start with Docker
+
+Alternatively, start the entire stack (Flask + MongoDB replica set) with Docker:
+
+```bash
+docker-compose up --build
+```
+
+---
+
+## Docker Development Workflow
+
+The `docker-compose.yml` orchestrates the Flask application and a MongoDB 3-node replica set for local development.
+
+```bash
+# Start all services (Flask + MongoDB replica set)
+docker-compose up --build
+
+# Start in detached mode
+docker-compose up --build -d
+
+# View logs
+docker-compose logs -f flask-app
+
+# Stop all services
+docker-compose down
+
+# Stop and remove volumes (clean slate)
+docker-compose down -v
+```
+
+| Service | URL | Description |
 |---|---|---|
-| Python | 3.9+ | Runtime for the Flask application |
-| pip | Latest | Python package installer |
-| virtualenv | 20.0+ (recommended) | Isolated Python environments (included with Python 3.3+ via `venv`) |
-| Git | 2.30+ | Version control |
+| Flask API | `http://localhost:5000` | Backend API server |
+| MongoDB Primary | `localhost:27017` | MongoDB primary node |
 
-## Installation
+- **Hot reload** is enabled via volume mount — code changes are reflected without rebuilding the container.
+- The MongoDB replica set is automatically initialized for local development, matching the production topology.
 
-### 1. Clone the repository
+---
 
-```bash
-git clone https://github.com/your-org/flask-server.git
-cd flask-server
-```
+## Running Tests
 
-### 2. Create and activate a virtual environment
+All tests use **pytest** as the test framework with fixtures defined in `tests/conftest.py`. External dependencies (Auth0, MongoDB, LLM providers, S3) are mocked in unit tests.
 
 ```bash
-python -m venv venv
+# Activate virtual environment
+source .venv/bin/activate
+
+# Run all tests
+pytest
+
+# Run unit tests only
+pytest tests/unit/
+
+# Run integration tests only
+pytest tests/integration/
+
+# Run with verbose output
+pytest -v --tb=short
+
+# Run with coverage report
+pytest --cov=app
+
+# Run with coverage and HTML report
+pytest --cov=app --cov-report=html
 ```
 
-Activate the virtual environment:
+Integration tests use the **Flask test client** to exercise the full request pipeline without requiring external services.
 
-```bash
-# Linux / macOS
-source venv/bin/activate
+---
 
-# Windows
-venv\Scripts\activate
-```
+## API Endpoint Reference
 
-### 3. Install dependencies
+All endpoints return JSON responses. Protected endpoints require a valid Auth0 JWT in the `Authorization: Bearer <token>` header.
 
-```bash
-pip install -r requirements.txt
-```
+### Health Check
 
-The `requirements.txt` includes all pinned dependencies. Key packages installed:
+| Method | Endpoint | Auth | Description |
+|---|---|---|---|
+| `GET` | `/api/health` | No | Liveness check — returns basic server status |
+| `GET` | `/api/health/ready` | No | Readiness check — verifies MongoDB and Auth0 JWKS connectivity |
 
-```text
-flask==3.1.3
-flask-cors==6.0.2
-flask-sqlalchemy==3.1.1
-flask-migrate==4.0.7
-python-dotenv==1.0.1
-gunicorn==23.0.0
-pytest==8.3.4
-```
+### Authentication
 
-### 4. Configure environment variables
+| Method | Endpoint | Auth | Description |
+|---|---|---|---|
+| `GET` | `/api/auth/profile` | Yes | Returns the decoded JWT claims for the authenticated user |
+| `POST` | `/api/auth/validate` | Yes | Validates the provided token and returns validation status |
 
-```bash
-cp .env.example .env
-```
+### Documents
 
-Edit `.env` with your local configuration:
+| Method | Endpoint | Auth | Description |
+|---|---|---|---|
+| `GET` | `/api/documents` | Yes | List all documents (paginated) |
+| `GET` | `/api/documents/<id>` | Yes | Retrieve a specific document by ID |
+| `POST` | `/api/documents` | Yes | Create a new document |
+| `PUT` | `/api/documents/<id>` | Yes | Update an existing document |
+| `DELETE` | `/api/documents/<id>` | Yes | Delete a document |
 
-```ini
-FLASK_APP=app.py
-FLASK_ENV=development
-SECRET_KEY=your-secret-key-here
-DATABASE_URL=sqlite:///app.db
-```
+### AI / LLM
 
-### 5. Run database migrations
+| Method | Endpoint | Auth | Description |
+|---|---|---|---|
+| `POST` | `/api/ai/query` | Yes | Submit an AI query with optional context document IDs |
+| `GET` | `/api/ai/results/<id>` | Yes | Retrieve the result of a previously submitted AI query |
 
-```bash
-flask db upgrade
-```
+### File Operations
 
-## Quickstart
+| Method | Endpoint | Auth | Description |
+|---|---|---|---|
+| `POST` | `/api/files/upload` | Yes | Upload a file to S3 (multipart form data) |
+| `GET` | `/api/files/<key>` | Yes | Generate a presigned download URL for a file |
+| `DELETE` | `/api/files/<key>` | Yes | Delete a file from S3 |
 
-### Start the development server
+### Error Response Format
 
-```bash
-flask run
-```
-
-The server starts on `http://localhost:5000` by default. Alternatively, run the application directly:
-
-```bash
-python app.py
-```
-
-### Verify the server is running
-
-```bash
-curl http://localhost:5000/health
-```
-
-Expected response:
+All error responses follow a consistent JSON structure:
 
 ```json
 {
-  "status": "healthy",
-  "database": "connected",
-  "timestamp": "2026-02-24T12:00:00+00:00"
+  "error": {
+    "code": 401,
+    "type": "AUTHENTICATION_ERROR",
+    "message": "Token expired"
+  }
 }
 ```
 
-### Make your first API call
+Error categories: Authentication (401/403), Validation (400), Database (500), LLM/AI (503), Infrastructure (500).
+
+---
+
+## Environment Variables Reference
+
+Copy `.env.example` to `.env` and configure all required values. All environment-specific settings are loaded from environment variables — no secrets are hardcoded.
+
+| Variable | Required | Default | Description |
+|---|---|---|---|
+| `FLASK_ENV` | Yes | `development` | Environment: `development`, `testing`, or `production` |
+| `SECRET_KEY` | Yes | — | Flask secret key for session signing and CSRF protection |
+| `AUTH0_DOMAIN` | Yes | — | Auth0 tenant domain (e.g., `your-tenant.auth0.com`) |
+| `AUTH0_API_AUDIENCE` | Yes | — | Auth0 API audience identifier |
+| `AUTH0_ALGORITHMS` | No | `RS256` | JWT signing algorithms (comma-separated) |
+| `MONGODB_URI` | Yes | `mongodb://localhost:27017` | MongoDB connection string |
+| `MONGODB_DATABASE` | No | `flask_backend` | MongoDB database name |
+| `AWS_S3_BUCKET` | Yes | — | S3 bucket name for file storage |
+| `AWS_ACCESS_KEY_ID` | Yes | — | AWS access key ID |
+| `AWS_SECRET_ACCESS_KEY` | Yes | — | AWS secret access key |
+| `AWS_REGION` | No | `us-east-1` | AWS region for S3 |
+| `LLM_PRIMARY_PROVIDER` | Yes | — | Primary LLM provider (`openai`, `anthropic`, or `google`) |
+| `LLM_PRIMARY_API_KEY` | Yes | — | API key for the primary LLM provider |
+| `LLM_SECONDARY_PROVIDER` | No | — | Secondary (fallback) LLM provider |
+| `LLM_SECONDARY_API_KEY` | No | — | API key for the secondary LLM provider |
+| `LLM_TERTIARY_PROVIDER` | No | — | Tertiary (last-resort) LLM provider |
+| `LLM_TERTIARY_API_KEY` | No | — | API key for the tertiary LLM provider |
+| `LOG_LEVEL` | No | `INFO` | Logging level (`DEBUG`, `INFO`, `WARNING`, `ERROR`) |
+| `CORS_ORIGINS` | No | `*` | Allowed CORS origins (comma-separated; restrict in production) |
+
+> **Production note:** In production, sensitive credentials are loaded from **AWS Secrets Manager** instead of `.env` files.
+
+---
+
+## Deployment Guide
+
+### Production Server
+
+The application uses **Gunicorn** as the WSGI server in production (Flask's development server must never be used in production or staging):
 
 ```bash
-curl -X GET http://localhost:5000/api/users/ \
-  -H "Authorization: Bearer <access_token>"
+gunicorn -c gunicorn.conf.py wsgi:app
 ```
 
-Example response:
+Gunicorn is configured with:
+- **Workers:** `2 × CPU cores + 1`
+- **Bind:** `0.0.0.0:8000`
+- **Timeout:** 120 seconds (accommodates AI-inclusive request latency up to 15s)
+- **Graceful timeout:** 30 seconds
 
-```json
-{
-  "data": [],
-  "total": 0,
-  "page": 1,
-  "pages": 0
-}
+### Docker Build
+
+```bash
+# Build the production image (multi-stage)
+docker build -t flask-backend .
+
+# Run the container
+docker run -p 8000:8000 --env-file .env flask-backend
 ```
+
+The Dockerfile uses a **multi-stage build**:
+1. **Builder stage** — Installs dependencies from `requirements.txt`
+2. **Runtime stage** — Copies installed packages and application code, sets Gunicorn as the entrypoint
+
+### CI/CD Pipeline
+
+The project uses **GitHub Actions** with a 7-stage quality gate pipeline defined in `.github/workflows/ci-cd.yml`:
+
+| Stage | Description | Gate |
+|---|---|---|
+| 1. **Lint** | ruff + black formatting check | Auto |
+| 2. **Type Check** | Optional mypy static analysis | Auto |
+| 3. **Unit Tests** | pytest with mocked dependencies | Auto |
+| 4. **Security Audit** | pip audit for known vulnerabilities | Auto |
+| 5. **Build** | Docker image build and push | Auto |
+| 6. **Deploy Staging** | Deploy to staging environment | Auto |
+| 7. **Deploy Production** | Deploy to production | Manual gate |
+
+### Health Checks
+
+Container orchestration platforms (ECS/Fargate) should target:
+- **Liveness:** `GET /api/health` — returns `200 OK` if the server is running
+- **Readiness:** `GET /api/health/ready` — returns `200 OK` if MongoDB and Auth0 JWKS are reachable
+
+---
 
 ## Project Structure
 
-```text
-flask-server/
-├── app.py                  # Application entry point and factory
-├── config.py               # Configuration management
-├── requirements.txt        # Python dependencies (pinned versions)
-├── .env.example            # Environment variable template
-├── routes/                 # Flask blueprints and route handlers
+```
+/
+├── README.md                          # Project documentation
+├── pyproject.toml                     # PEP 621 dependency manifest
+├── requirements.txt                   # pip-compatible dependency list
+├── .env.example                       # Environment variable template
+├── .gitignore                         # Git ignore patterns
+├── ruff.toml                          # Ruff linter configuration
+├── Dockerfile                         # Multi-stage container build
+├── docker-compose.yml                 # Local development orchestration
+├── gunicorn.conf.py                   # Gunicorn WSGI server config
+├── wsgi.py                            # WSGI entry point for Gunicorn
+├── run.py                             # Development server entry point
+├── .github/
+│   └── workflows/
+│       └── ci-cd.yml                  # 7-stage CI/CD pipeline
+├── app/
+│   ├── __init__.py                    # Application Factory (create_app)
+│   ├── config.py                      # Environment-aware configuration
+│   ├── extensions.py                  # Flask extension initialization
+│   ├── middleware/
+│   │   ├── __init__.py
+│   │   └── jwt_auth.py               # JWT verification middleware
+│   ├── routes/
+│   │   ├── __init__.py                # Blueprint registration
+│   │   ├── health.py                  # Health check endpoints
+│   │   ├── auth.py                    # Auth-related routes
+│   │   ├── documents.py               # Document CRUD routes
+│   │   ├── ai.py                      # AI/LLM query routes
+│   │   └── files.py                   # File upload/download routes
+│   ├── services/
+│   │   ├── __init__.py
+│   │   ├── auth_service.py            # Auth business logic
+│   │   ├── document_service.py        # Document business logic
+│   │   ├── ai_service.py             # AI/LLM orchestration
+│   │   ├── file_service.py           # S3 file operations
+│   │   └── audit_service.py          # Audit logging
+│   ├── repositories/
+│   │   ├── __init__.py
+│   │   ├── base_repository.py        # Abstract repository with PyMongo
+│   │   ├── document_repository.py    # Document data access
+│   │   ├── ai_result_repository.py   # AI result persistence
+│   │   └── audit_repository.py       # Audit log data access
+│   ├── schemas/
+│   │   ├── __init__.py
+│   │   ├── auth_schemas.py           # Auth request/response models
+│   │   ├── document_schemas.py       # Document validation models
+│   │   ├── ai_schemas.py             # AI request/response models
+│   │   ├── file_schemas.py           # File operation models
+│   │   └── error_schemas.py          # Structured error models
+│   ├── models/
+│   │   ├── __init__.py
+│   │   └── domain.py                 # Domain data models
+│   ├── errors/
+│   │   ├── __init__.py
+│   │   └── handlers.py               # Centralized error handlers
+│   └── utils/
+│       ├── __init__.py
+│       ├── logging.py                 # Structured logging setup
+│       └── retry.py                   # Retry with backoff utilities
+├── tests/
 │   ├── __init__.py
-│   ├── auth.py             # Authentication endpoints
-│   ├── users.py            # User management endpoints
-│   └── health.py           # Health check endpoint
-├── models/                 # SQLAlchemy ORM models
-│   ├── __init__.py
-│   └── user.py             # User model definition
-├── services/               # Business logic layer
-│   ├── __init__.py
-│   ├── auth_service.py     # Authentication service
-│   └── user_service.py     # User service
-├── middleware/              # Request middleware
-│   ├── __init__.py
-│   ├── auth.py             # Authentication middleware
-│   └── logging.py          # Request logging middleware
-├── tests/                  # Test suite
-│   ├── __init__.py
-│   ├── conftest.py         # Shared pytest fixtures
-│   ├── test_auth.py        # Authentication tests
-│   └── test_users.py       # User endpoint tests
-├── migrations/             # Alembic migration scripts
-├── docs/                   # Project documentation (MkDocs)
-├── mkdocs.yml              # Documentation configuration
-├── CONTRIBUTING.md          # Contribution guidelines
-└── CHANGELOG.md             # Version history
+│   ├── conftest.py                    # Shared fixtures, test app factory
+│   ├── unit/
+│   │   ├── __init__.py
+│   │   ├── test_config.py
+│   │   ├── test_jwt_auth.py
+│   │   ├── test_document_service.py
+│   │   ├── test_ai_service.py
+│   │   └── test_file_service.py
+│   └── integration/
+│       ├── __init__.py
+│       ├── test_health_routes.py
+│       ├── test_document_routes.py
+│       └── test_ai_routes.py
+└── scripts/
+    ├── init_db.py                     # MongoDB initialization script
+    └── seed_data.py                   # Development seed data
 ```
 
-## API Overview
+---
 
-The Flask server exposes a RESTful API organized into the following endpoint groups:
+## Contributing Guidelines
 
-| Endpoint Group | Base Path | Description |
-|---|---|---|
-| Health | `/health` | Server health check and status |
-| Authentication | `/api/auth` | Login, logout, token refresh, and registration |
-| Users | `/api/users` | User CRUD operations and profile management |
-| Resources | `/api/resources` | Core resource management endpoints |
+### Code Standards
 
-All endpoints return JSON responses and use standard HTTP status codes. Authentication-protected endpoints require a valid bearer token in the `Authorization` header.
+- **PEP 8 compliance** — Enforced via [ruff](https://docs.astral.sh/ruff/) (`ruff check .`)
+- **Black formatting** — Line length 100, enforced via [black](https://black.readthedocs.io/) (`black --check .`)
+- **Type hints** — Use Python 3.14 type hints for all function signatures
+- **Docstrings** — All public functions, classes, and modules must include docstrings
 
-For the complete API reference with request and response schemas, status codes, and example payloads, see the [API Reference](docs/api-reference/endpoints.md).
+### Architecture Rules
 
-## Documentation
+- **Repository Pattern** — All database access must go through repository classes. No direct PyMongo calls in services, routes, or middleware.
+- **Layered architecture** — Respect the unidirectional flow: Route Handlers → Service Layer → Repository Layer. No layer bypass.
+- **Stateless backend** — No server-side session state. Auth0 manages all session concerns.
+- **Configuration-driven** — No hardcoded secrets or environment-specific values.
 
-Comprehensive project documentation is available in the `docs/` directory and can be built into a browsable site using MkDocs.
+### Development Workflow
 
-### Build and serve documentation locally
+1. Create a feature branch from `main`
+2. Implement changes following the architecture and code standards above
+3. Ensure all linting passes: `ruff check .` and `black --check .`
+4. Ensure all tests pass: `pytest -v`
+5. Submit a pull request for review
+6. All CI/CD pipeline stages must pass before merge
 
-```bash
-pip install mkdocs==1.6.1 mkdocs-material==9.7.2 mkdocs-mermaid2-plugin==1.2.3
-mkdocs serve --dev-addr 127.0.0.1:8000
-```
+### Testing Requirements
 
-### Documentation guides
+- All new features must include unit tests
+- Mock all external dependencies (Auth0, MongoDB, LLM providers, S3) in unit tests
+- Use the Flask test client for integration tests
+- Aim for meaningful coverage of business logic and error paths
 
-| Guide | Path | Description |
-|---|---|---|
-| Installation Guide | [docs/getting-started/installation.md](docs/getting-started/installation.md) | Python, Flask, and dependency setup |
-| Quickstart Guide | [docs/getting-started/quickstart.md](docs/getting-started/quickstart.md) | First run and server verification |
-| Configuration Guide | [docs/getting-started/configuration.md](docs/getting-started/configuration.md) | Environment variables and config files |
-| Architecture Overview | [docs/architecture/overview.md](docs/architecture/overview.md) | System design and component diagrams |
-| API Reference | [docs/api-reference/endpoints.md](docs/api-reference/endpoints.md) | Complete REST API endpoint catalog |
-| Migration Guide | [docs/guides/migration-from-nodejs.md](docs/guides/migration-from-nodejs.md) | Node.js to Flask migration mapping |
-| Contributing | [CONTRIBUTING.md](CONTRIBUTING.md) | Development setup and coding standards |
-| Changelog | [CHANGELOG.md](CHANGELOG.md) | Version history and release notes |
-
-## Contributing
-
-Contributions are welcome! Whether you are fixing a bug, adding a feature, improving documentation, or reporting an issue, your contribution helps maintain feature parity and improve the Flask server.
-
-Please read the [Contributing Guide](CONTRIBUTING.md) for detailed instructions on setting up your development environment, coding standards, branch naming conventions, commit message format, and the pull request process.
+---
 
 ## License
 
-This project is licensed under the MIT License.
+This project is licensed under the MIT License. See [LICENSE](LICENSE) for details.
