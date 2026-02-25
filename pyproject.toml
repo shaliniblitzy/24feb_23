@@ -1,0 +1,107 @@
+# =============================================================================
+# pyproject.toml — PEP 621 Project Manifest
+# =============================================================================
+# Production-ready Python 3/Flask backend API server configuration.
+# Defines project metadata, all dependency pins (production + dev groups),
+# build system configuration, and tool settings for ruff, black, and pytest.
+# =============================================================================
+
+# ---------------------------------------------------------------------------
+# Build System (PEP 517 / PEP 518)
+# ---------------------------------------------------------------------------
+[build-system]
+requires = ["setuptools>=75.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+# ---------------------------------------------------------------------------
+# Project Metadata (PEP 621)
+# ---------------------------------------------------------------------------
+[project]
+name = "flask-backend"
+version = "1.0.0"
+description = "Production-ready Python 3/Flask backend API server with Auth0 JWT authentication, MongoDB persistence, LangChain AI orchestration, and AWS S3 file storage"
+readme = "README.md"
+requires-python = ">=3.14"
+license = {text = "MIT"}
+authors = [
+    {name = "Flask Backend Team"},
+]
+keywords = ["flask", "api", "backend", "auth0", "mongodb", "langchain", "aws"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Framework :: Flask",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.14",
+    "Topic :: Internet :: WWW/HTTP :: WSGI :: Application",
+    "Topic :: Software Development :: Libraries :: Application Frameworks",
+    "Typing :: Typed",
+]
+
+# ---------------------------------------------------------------------------
+# Production Dependencies
+# ---------------------------------------------------------------------------
+# All version pins validated against Python 3.14.3 runtime.
+# See AAP §0.4.1 for the full dependency inventory and validation matrix.
+dependencies = [
+    "flask==3.1.3",
+    "langchain~=1.2.10",
+    "langchain-core~=1.2.15",
+    "pymongo~=4.16",
+    "gunicorn~=25.0",
+    "python-dotenv~=1.0",
+    "flask-cors~=6.0",
+    "pydantic~=2.12",
+    "authlib~=1.6",
+    "boto3~=1.42",
+]
+
+# ---------------------------------------------------------------------------
+# Optional Dependencies (Development)
+# ---------------------------------------------------------------------------
+[project.optional-dependencies]
+dev = [
+    "ruff~=0.15",
+    "black~=26.0",
+    "pytest~=9.0",
+]
+
+# ---------------------------------------------------------------------------
+# Setuptools Package Discovery
+# ---------------------------------------------------------------------------
+[tool.setuptools.packages.find]
+include = ["app*"]
+exclude = ["tests*", "scripts*", "docs*"]
+
+# ---------------------------------------------------------------------------
+# Black Formatter Configuration
+# ---------------------------------------------------------------------------
+# Per AAP §0.7.3: "Black formatting enforced — line length 100"
+[tool.black]
+line-length = 100
+target-version = ["py314"]
+
+# ---------------------------------------------------------------------------
+# Pytest Configuration
+# ---------------------------------------------------------------------------
+# Per AAP §0.7.4: "pytest as the sole test framework"
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = "-v --tb=short"
+
+# ---------------------------------------------------------------------------
+# Ruff Linter Configuration
+# ---------------------------------------------------------------------------
+# Per AAP §0.7.3: "PEP 8 compliance enforced via Ruff"
+# This mirrors ruff.toml for tools that read pyproject.toml directly.
+[tool.ruff]
+target-version = "py314"
+line-length = 100
+src = ["app", "tests", "scripts"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "N", "UP"]
