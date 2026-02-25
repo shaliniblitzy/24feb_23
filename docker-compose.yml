@@ -1,0 +1,295 @@
+# =============================================================================
+# docker-compose.yml — Local Development Orchestration
+# =============================================================================
+#
+# Orchestrates the Flask backend application, a MongoDB 3-node replica set
+# (matching production topology), and an optional Mongo Express admin UI
+# for local development.
+#
+# Usage:
+#   Start all services:
+#     docker compose up --build
+#
+#   Start with admin UI (Mongo Express):
+#     docker compose --profile admin up --build
+#
+#   Stop all services:
+#     docker compose down
+#
+#   Stop and remove volumes (full reset):
+#     docker compose down -v
+#
+# Services:
+#   flask-app        — Flask backend (port 5000)
+#   mongo-primary    — MongoDB primary node (port 27017)
+#   mongo-secondary1 — MongoDB secondary node (port 27018)
+#   mongo-secondary2 — MongoDB secondary node (port 27019)
+#   mongo-init       — One-shot replica set initializer
+#   mongo-express    — Optional web-based MongoDB admin UI (port 8081)
+#
+# Prerequisites:
+#   - Docker Engine 29.x+ and Docker Compose v2
+#   - Copy .env.example to .env and populate with your configuration values
+#
+# MongoDB version requirement:
+#   The mongo:8.0 tag guarantees MongoDB 8.0.17+ which includes the critical
+#   security patch for MongoBleed (CVE-2025-14847).
+#
+# =============================================================================
+
+services:
+  # ---------------------------------------------------------------------------
+  # Flask Application Service
+  # ---------------------------------------------------------------------------
+  # Builds from the local Dockerfile and runs the Flask development server
+  # with hot-reload enabled via volume mount.  For production, replace the
+  # command with Gunicorn (see commented alternative below).
+  # ---------------------------------------------------------------------------
+  flask-app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: flask-app
+    ports:
+      - "5000:5000"
+    volumes:
+      # Mount the project root into /app for hot-reload during development.
+      # Source code changes are reflected immediately without rebuilding.
+      - .:/app
+    env_file:
+      - .env
+    environment:
+      # Override environment variables for local development context.
+      # Auth0, LLM, and AWS settings are loaded from the .env file above.
+      FLASK_ENV: development
+      MONGODB_URI: "mongodb://mongo-primary:27017,mongo-secondary1:27018,mongo-secondary2:27019/flask_app?replicaSet=rs0"
+    # Development command: Flask dev server with debug mode and auto-reload.
+    # For production or staging, use Gunicorn instead:
+    #   command: ["gunicorn", "-c", "gunicorn.conf.py", "wsgi:app"]
+    command: ["python", "run.py"]
+    depends_on:
+      mongo-primary:
+        condition: service_healthy
+      mongo-secondary1:
+        condition: service_started
+      mongo-secondary2:
+        condition: service_started
+      mongo-init:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/api/health"]
+      interval: 30s
+      timeout: 10s
+      start_period: 40s
+      retries: 3
+    networks:
+      - backend-network
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------------------
+  # MongoDB Primary Node
+  # ---------------------------------------------------------------------------
+  # The primary node of the 3-node replica set.  Accepts both reads and writes.
+  # Uses the mongo:8.0 image which guarantees MongoDB 8.0.17+ including the
+  # MongoBleed (CVE-2025-14847) security patch.
+  # ---------------------------------------------------------------------------
+  mongo-primary:
+    image: mongo:8.0
+    container_name: mongo-primary
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo-primary-data:/data/db
+    command: ["mongod", "--replSet", "rs0", "--bind_ip_all"]
+    healthcheck:
+      test: >
+        mongosh --quiet --eval "
+          try { rs.status().ok } catch(e) { db.adminCommand('ping').ok }
+        " || exit 1
+      interval: 10s
+      timeout: 5s
+      start_period: 30s
+      retries: 5
+    networks:
+      - backend-network
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------------------
+  # MongoDB Secondary Node 1
+  # ---------------------------------------------------------------------------
+  # First secondary node of the replica set.  Replicates data from the primary
+  # and can serve reads when configured with appropriate read preferences.
+  # ---------------------------------------------------------------------------
+  mongo-secondary1:
+    image: mongo:8.0
+    container_name: mongo-secondary1
+    ports:
+      - "27018:27017"
+    volumes:
+      - mongo-secondary1-data:/data/db
+    command: ["mongod", "--replSet", "rs0", "--bind_ip_all"]
+    depends_on:
+      mongo-primary:
+        condition: service_started
+    healthcheck:
+      test: >
+        mongosh --quiet --eval "db.adminCommand('ping').ok" || exit 1
+      interval: 10s
+      timeout: 5s
+      start_period: 30s
+      retries: 5
+    networks:
+      - backend-network
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------------------
+  # MongoDB Secondary Node 2
+  # ---------------------------------------------------------------------------
+  # Second secondary node of the replica set.  Together with the primary and
+  # the first secondary, this forms the required 3-node replica set that
+  # matches the production topology.
+  # ---------------------------------------------------------------------------
+  mongo-secondary2:
+    image: mongo:8.0
+    container_name: mongo-secondary2
+    ports:
+      - "27019:27017"
+    volumes:
+      - mongo-secondary2-data:/data/db
+    command: ["mongod", "--replSet", "rs0", "--bind_ip_all"]
+    depends_on:
+      mongo-primary:
+        condition: service_started
+    healthcheck:
+      test: >
+        mongosh --quiet --eval "db.adminCommand('ping').ok" || exit 1
+      interval: 10s
+      timeout: 5s
+      start_period: 30s
+      retries: 5
+    networks:
+      - backend-network
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------------------
+  # MongoDB Replica Set Initializer
+  # ---------------------------------------------------------------------------
+  # One-shot service that initiates the 3-node replica set via rs.initiate().
+  # Waits for the primary node to become responsive, then configures the
+  # replica set topology.  Exits with code 0 on success.
+  # ---------------------------------------------------------------------------
+  mongo-init:
+    image: mongo:8.0
+    container_name: mongo-init
+    depends_on:
+      mongo-primary:
+        condition: service_healthy
+      mongo-secondary1:
+        condition: service_started
+      mongo-secondary2:
+        condition: service_started
+    networks:
+      - backend-network
+    restart: "no"
+    entrypoint: >
+      mongosh --host mongo-primary:27017 --eval '
+        // Check if replica set is already initiated
+        var status;
+        try {
+          status = rs.status();
+        } catch(e) {
+          status = null;
+        }
+
+        if (status && status.ok === 1) {
+          print("Replica set already initiated — skipping initialization.");
+        } else {
+          print("Initiating replica set rs0 with 3 members...");
+          rs.initiate({
+            _id: "rs0",
+            members: [
+              { _id: 0, host: "mongo-primary:27017", priority: 2 },
+              { _id: 1, host: "mongo-secondary1:27017", priority: 1 },
+              { _id: 2, host: "mongo-secondary2:27017", priority: 1 }
+            ]
+          });
+
+          // Wait for the primary to be elected (up to 30 seconds)
+          var attempts = 0;
+          while (attempts < 30) {
+            var s = rs.status();
+            var primary = s.members.filter(function(m) {
+              return m.stateStr === "PRIMARY";
+            });
+            if (primary.length > 0) {
+              print("Replica set rs0 initiated successfully. Primary: " + primary[0].name);
+              break;
+            }
+            print("Waiting for primary election... attempt " + (attempts + 1));
+            sleep(1000);
+            attempts++;
+          }
+
+          if (attempts >= 30) {
+            print("WARNING: Primary election did not complete within 30 seconds.");
+            print("The replica set may still be initializing. Current status:");
+            printjson(rs.status());
+          }
+        }
+      '
+
+  # ---------------------------------------------------------------------------
+  # Mongo Express — Optional Web-Based Admin UI
+  # ---------------------------------------------------------------------------
+  # Browser-based MongoDB administration tool accessible at http://localhost:8081.
+  # Opt-in via the "admin" profile:
+  #   docker compose --profile admin up
+  #
+  # Not started by default to conserve system resources.
+  # ---------------------------------------------------------------------------
+  mongo-express:
+    image: mongo-express:latest
+    container_name: mongo-express
+    profiles:
+      - admin
+    ports:
+      - "8081:8081"
+    environment:
+      ME_CONFIG_MONGODB_URL: "mongodb://mongo-primary:27017,mongo-secondary1:27018,mongo-secondary2:27019/?replicaSet=rs0"
+      ME_CONFIG_BASICAUTH: "false"
+    depends_on:
+      mongo-primary:
+        condition: service_healthy
+      mongo-init:
+        condition: service_completed_successfully
+    networks:
+      - backend-network
+    restart: unless-stopped
+
+# =============================================================================
+# Networks
+# =============================================================================
+# Custom bridge network for inter-service communication.  All services
+# communicate on this network using their service names as hostnames.
+# =============================================================================
+networks:
+  backend-network:
+    driver: bridge
+    name: flask-backend-network
+
+# =============================================================================
+# Volumes
+# =============================================================================
+# Named volumes for MongoDB data persistence.  Data survives container
+# restarts and recreation.  Use "docker compose down -v" for a full reset.
+# =============================================================================
+volumes:
+  mongo-primary-data:
+    driver: local
+    name: flask-mongo-primary-data
+  mongo-secondary1-data:
+    driver: local
+    name: flask-mongo-secondary1-data
+  mongo-secondary2-data:
+    driver: local
+    name: flask-mongo-secondary2-data
